@@ -67,7 +67,7 @@ const SettingsPage = () => {
             name="moistureThreshold"
             value={settings.moistureThreshold ?? ""}
             onChange={handleChange}
-            className="w-full px-2 py-1 text-sm bg-slate-900 border border-slate-700 rounded"
+            className="w-full px-2 py-1 text-sm bg-white border border-slate-700 rounded"
           />
         </div>
 
@@ -80,7 +80,7 @@ const SettingsPage = () => {
             name="lightThreshold"
             value={settings.lightThreshold ?? ""}
             onChange={handleChange}
-            className="w-full px-2 py-1 text-sm bg-slate-900 border border-slate-700 rounded"
+            className="w-full px-2 py-1 text-sm bg-white border border-slate-700 rounded"
           />
         </div>
 
@@ -91,7 +91,7 @@ const SettingsPage = () => {
             name="thingSpeakChannelId"
             value={settings.thingSpeakChannelId ?? ""}
             onChange={handleChange}
-            className="w-full px-2 py-1 text-sm bg-slate-900 border border-slate-700 rounded"
+            className="w-full px-2 py-1 text-sm bg-white border border-slate-700 rounded"
           />
         </div>
 
