@@ -8,9 +8,11 @@ const settingsSchema = new mongoose.Schema(
     thingSpeakChannelId: { type: String },
     thingSpeakReadApiKey: { type: String },
     thingSpeakWriteApiKey: { type: String }, // if you want to send commands
+    logClearCutoff: { type: Date, default: null },
   },
   { timestamps: true }
 );
 
 const Settings = mongoose.model("Settings", settingsSchema);
+
 export default Settings;

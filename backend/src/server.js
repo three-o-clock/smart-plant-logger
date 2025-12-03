@@ -3,12 +3,13 @@ import mongoose from "mongoose";
 import dotenv from "dotenv";
 import cors from "cors";
 import thingSpeakRoutes from "./routes/thingspeak.js";
-
+import waterLogsRoute from "./routes/waterLogs.js";
 
 import authRoutes from "./routes/auth.js";
 import logRoutes from "./routes/logs.js";
 import settingsRoutes from "./routes/settings.js";
 import waterRoutes from "./routes/water.js";
+
 
 dotenv.config();
 
@@ -23,6 +24,7 @@ app.use("/api/logs", logRoutes);
 app.use("/api/settings", settingsRoutes);
 app.use("/api/water", waterRoutes);
 app.use("/api/thingspeak", thingSpeakRoutes);
+app.use("/waterlogs", waterLogsRoute);
 
 
 app.get("/", (req, res) => {
