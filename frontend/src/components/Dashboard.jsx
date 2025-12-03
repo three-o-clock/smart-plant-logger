@@ -8,22 +8,25 @@ const Dashboard = () => {
   const [logs, setLogs] = useState([]);
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [watering, setWatering] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [liveReading, setLiveReading] = useState(null);
+  const [toast, setToast] = useState(null);
 
   const fetchData = async () => {
     try {
       setLoading(true);
       const [logsRes, settingsRes] = await Promise.all([
-        api.get("/logs"),
+        api.get("/logs"), // backend should already limit to 5
         api.get("/settings"),
       ]);
-      setLogs(logsRes.data);
-      setSettings(settingsRes.data);
+      setLogs(logsRes.data || []);
+      setSettings(settingsRes.data || null);
     } catch (err) {
-      console.error(err);
-      alert("Failed to load data");
+      console.error("fetchData error:", err);
+      setToast({
+        type: "error",
+        message: "Failed to load dashboard data.",
+      });
     } finally {
       setLoading(false);
     }
@@ -33,57 +36,84 @@ const Dashboard = () => {
     fetchData();
   }, []);
 
-  const latestLog = logs[0] || null;
-  const latestReading = liveReading || latestLog || null;
-  const moistureThreshold = settings?.moistureThreshold ?? 30;
-
-  const handleClearLogs = async () => {
-    if (!window.confirm("Clear all watering logs?")) return;
-    try {
-      await api.delete("/logs");
-      setLogs([]);
-    } catch (err) {
-      console.error(err);
-      alert("Failed to clear logs");
-    }
-  };
-
   const handleRefresh = async () => {
     try {
       setRefreshing(true);
-      // 1) Get latest sensor reading from ThingSpeak
+      // 1) latest live reading from ThingSpeak
       const latestRes = await api.get("/thingspeak/latest");
       setLiveReading(latestRes.data);
 
-      // 2) Sync automatic watering logs into Mongo
+      // 2) sync automatic logs into DB
       await api.post("/thingspeak/sync-auto");
 
-      // 3) Reload logs from backend
+      // 3) reload logs/settings
       await fetchData();
+
+      setToast({
+        type: "success",
+        message: "Dashboard updated with latest ThingSpeak data.",
+      });
     } catch (err) {
       console.error("Refresh error:", err.response?.data || err.message);
-      alert(
-        "Failed to refresh from ThingSpeak: " +
-          (err.response?.data?.message || err.message)
-      );
+      setToast({
+        type: "error",
+        message:
+          err.response?.data?.message ||
+          "Failed to refresh from ThingSpeak. Please try again.",
+      });
     } finally {
       setRefreshing(false);
     }
   };
 
-  if (loading) return <p>Loading dashboard...</p>;
+  const handleClearLogs = async () => {
+    const ok = window.confirm(
+      "Clear all watering logs?\n\nThis cannot be undone. Logs cannot be retrieved once cleared."
+    );
+    if (!ok) return;
+
+    try {
+      const res = await api.delete("/logs");
+      setLogs([]);
+      setToast({
+        type: "success",
+        message:
+          res.data?.message || "All watering logs have been permanently cleared.",
+      });
+    } catch (err) {
+      console.error("Clear logs error:", err);
+      setToast({
+        type: "error",
+        message:
+          err.response?.data?.message ||
+          "Failed to clear logs from the database.",
+      });
+    }
+  };
+
+  const latestLog = logs[0] || null;
+  const latestReading = liveReading || latestLog || null;
+  const moistureThreshold = settings?.moistureThreshold ?? 30;
+
+  if (loading) {
+    return (
+      <div className="p-4 text-sm text-slate-600">
+        Loading dashboard...
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">
-      {/* Header row */}
+      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div>
           <h1 className="text-xl md:text-2xl font-semibold text-slate-900">
             Plant Health Dashboard
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            Monitor live readings and keep a complete log of every watering
-            event.
+            Automatically logged watering events and live readings from your smart
+            plant.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -103,14 +133,14 @@ const Dashboard = () => {
         </div>
       </div>
 
+      {/* Plant health + notification */}
       <PlantHealthCard latestReading={latestReading} settings={settings} />
-
       <NotificationBanner
         latestLog={latestReading}
         moistureThreshold={moistureThreshold}
       />
 
-      {/* Stats row */}
+      {/* Stat cards */}
       {latestReading ? (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <StatCard
@@ -140,11 +170,11 @@ const Dashboard = () => {
         </div>
       ) : (
         <div className="text-xs text-slate-500">
-          No data yet. Use Refresh to pull latest values from ThingSpeak.
+          No data yet. Use Refresh to pull the latest values from ThingSpeak.
         </div>
       )}
 
-      {/* Graph + summary cards */}
+      {/* Graphs + stats */}
       <div className="grid lg:grid-cols-[1.2fr,1fr] gap-4">
         <div className="bg-white border border-slate-200 rounded-2xl p-3 shadow-sm">
           <h2 className="text-sm font-semibold text-slate-800 mb-2">
@@ -156,107 +186,70 @@ const Dashboard = () => {
         <WateringStatsCard logs={logs} />
       </div>
 
-      {/* Full log table */}
+      {/* Complete log table */}
       <div className="bg-white border border-slate-200 rounded-2xl p-3 shadow-sm">
         <h2 className="text-sm font-semibold text-slate-800 mb-2">
           Complete Watering Log
         </h2>
         <LogsTable logs={logs} moistureThreshold={moistureThreshold} />
       </div>
+
+      <Toast toast={toast} onClose={() => setToast(null)} />
     </div>
   );
 };
 
 /* ---------- Plant Health Card ---------- */
 
-const PlantHealthCard = ({ latestReading, settings }) => {
+const PlantHealthCard = ({ latestReading }) => {
   if (!latestReading) {
     return (
-      <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between">
-        <div>
-          <div className="text-xs font-semibold text-slate-700">
-            Plant Health
-          </div>
-          <div className="text-xs text-slate-500 mt-1">
-            No data yet. Refresh to pull the latest sensor values from
-            ThingSpeak.
-          </div>
+      <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+        <div className="text-xs font-semibold text-slate-700">Plant Health</div>
+        <div className="text-xs text-slate-500 mt-1">
+          No data yet. Refresh to pull the latest sensor values.
         </div>
-        <span className="px-3 py-1 text-[11px] rounded-full bg-slate-200 text-slate-700">
-          Unknown
-        </span>
       </div>
     );
   }
 
-  const moistureThreshold = settings?.moistureThreshold ?? 900;
-  const lightThreshold = settings?.lightThreshold ?? 30;
-
-  const { soilMoisture, temperature, humidity, lightIntensity, timestamp } =
+  const { soilMoisture, lightIntensity, temperature, humidity, timestamp } =
     latestReading;
 
-  const issues = [];
-
-  if (soilMoisture < moistureThreshold) {
-    issues.push("Low soil moisture");
-  }
-  if (lightIntensity < lightThreshold) {
-    issues.push("Low light");
-  }
-  if (temperature < 18 || temperature > 32) {
-    issues.push("Temperature not ideal");
-  }
-  if (humidity < 35 || humidity > 80) {
-    issues.push("Humidity not ideal");
-  }
-
   let status = "Good";
-  let badgeClasses = "bg-emerald-500 text-white";
+  let description = "Moisture level is within optimal range.";
+  let badgeClasses = "bg-emerald-600 text-white";
   let cardClasses = "bg-emerald-50 border-emerald-200";
-  let description = "Your plant looks healthy based on the latest readings.";
 
-  if (issues.length === 1) {
-    status = "Fair";
-    badgeClasses = "bg-amber-500 text-white";
-    cardClasses = "bg-amber-50 border-amber-200";
-    description = "One parameter needs attention. Consider checking soon.";
-  } else if (issues.length >= 2) {
-    status = "Poor";
-    badgeClasses = "bg-red-500 text-white";
+  // Soil-based logic ONLY
+  if (soilMoisture >= 800) {
+    status = "Dry";
+    description = "Soil is dry — watering required.";
+    badgeClasses = "bg-red-600 text-white";
     cardClasses = "bg-red-50 border-red-200";
-    description = "Multiple parameters are out of range. Check the plant now.";
+  } else if (soilMoisture <= 500) {
+    status = "Wet";
+    description = "Soil is too wet — reduce watering.";
+    badgeClasses = "bg-sky-600 text-white";
+    cardClasses = "bg-sky-50 border-sky-200";
   }
 
   return (
-    <div
-      className={`rounded-xl p-3 border flex items-start justify-between gap-3 ${cardClasses}`}
-    >
+    <div className={`rounded-xl p-3 border flex items-start justify-between gap-3 ${cardClasses}`}>
       <div>
         <div className="text-xs font-semibold text-slate-800">Plant Health</div>
         <div className="text-xs text-slate-600 mt-1">{description}</div>
-        {issues.length > 0 && (
-          <ul className="mt-2 text-[11px] text-slate-700 list-disc list-inside space-y-0.5">
-            {issues.map((issue) => (
-              <li key={issue}>{issue}</li>
-            ))}
-          </ul>
-        )}
-        {issues.length === 0 && (
-          <div className="mt-2 text-[11px] text-slate-600">
-            Moisture, light, temperature and humidity are all in acceptable
-            ranges.
-          </div>
-        )}
+        <div className="mt-2 text-[11px] text-slate-700">
+          Soil Moisture: <span className="font-semibold">{soilMoisture}</span>
+        </div>
       </div>
       <div className="flex flex-col items-end gap-1">
-        <span
-          className={`px-3 py-1 text-[11px] rounded-full font-medium ${badgeClasses}`}
-        >
+        <span className={`px-3 py-1 text-[11px] rounded-full font-medium ${badgeClasses}`}>
           {status}
         </span>
         {timestamp && (
-          <div className="text-[10px] text-slate-600 text-right">
-            Last update:{" "}
+          <div className="text-[10px] text-slate-600">
+            Updated:{" "}
             {new Date(timestamp).toLocaleTimeString([], {
               hour: "2-digit",
               minute: "2-digit",
@@ -303,8 +296,10 @@ const StatCard = ({ label, value, unit, accent = "emerald" }) => {
   );
 };
 
+/* ---------- Watering stats card ---------- */
+
 const WateringStatsCard = ({ logs }) => {
-  if (!logs.length) {
+  if (!logs || logs.length === 0) {
     return (
       <div className="bg-white border border-slate-200 rounded-2xl p-3 shadow-sm">
         <h2 className="text-sm font-semibold text-slate-800 mb-1">
@@ -320,7 +315,6 @@ const WateringStatsCard = ({ logs }) => {
   const last = logs[0];
   const now = new Date();
 
-  // watered today
   const wateredToday = logs.filter((log) => {
     const d = new Date(log.timestamp);
     return (
@@ -330,12 +324,15 @@ const WateringStatsCard = ({ logs }) => {
     );
   }).length;
 
-  // moisture stats
-  const moistures = logs.map((l) => l.soilMoisture).filter((m) => m != null);
+  const moistures = logs
+    .map((l) => l.soilMoisture)
+    .filter((m) => m !== null && m !== undefined);
+
   const avgMoisture =
-    moistures.reduce((sum, m) => sum + m, 0) / moistures.length;
-  const minMoisture = Math.min(...moistures);
-  const maxMoisture = Math.max(...moistures);
+    moistures.reduce((sum, m) => sum + m, 0) /
+    (moistures.length || 1);
+  const minMoisture = moistures.length ? Math.min(...moistures) : 0;
+  const maxMoisture = moistures.length ? Math.max(...moistures) : 0;
 
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-3 shadow-sm">
@@ -396,5 +393,70 @@ const WateringStatsCard = ({ logs }) => {
     </div>
   );
 };
+
+/* ---------- Toast ---------- */
+
+const Toast = ({ toast, onClose }) => {
+  const [show, setShow] = useState(false);
+
+  // When a new toast comes in, show it and auto-hide after 3.5s
+  useEffect(() => {
+    if (toast) {
+      setShow(true);
+      const timer = setTimeout(() => {
+        setShow(false);
+      }, 3500);
+
+      return () => clearTimeout(timer);
+    } else {
+      setShow(false);
+    }
+  }, [toast]);
+
+  // After the hide animation finishes, actually clear the toast state
+  useEffect(() => {
+    if (!show && toast) {
+      const timer = setTimeout(() => {
+        onClose?.();
+      }, 200); // match transition duration
+      return () => clearTimeout(timer);
+    }
+  }, [show, toast, onClose]);
+
+  if (!toast && !show) return null;
+
+  const base =
+  "fixed top-4 right-4 z-50 max-w-sm rounded-xl shadow-lg px-4 py-3 text-sm flex items-start gap-3 border transform transition-all duration-300 ease-out";
+
+
+  const styles =
+    toast?.type === "error"
+      ? "bg-red-50 border-red-200 text-red-800"
+      : "bg-emerald-50 border-emerald-200 text-emerald-800";
+
+  const motion = show ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-4";
+
+  return (
+    <div className={`${base} ${styles} ${motion}`}>
+      <div className="mt-0.5">
+        {toast?.type === "error" ? "⚠️" : "✅"}
+      </div>
+      <div className="flex-1">
+        <div className="font-semibold text-xs mb-0.5">
+          {toast?.title ||
+            (toast?.type === "error" ? "Something went wrong" : "Success")}
+        </div>
+        <div>{toast?.message}</div>
+      </div>
+      <button
+        onClick={() => setShow(false)}
+        className="ml-2 text-xs text-slate-500 hover:text-slate-700"
+      >
+        ✕
+      </button>
+    </div>
+  );
+};
+
 
 export default Dashboard;
