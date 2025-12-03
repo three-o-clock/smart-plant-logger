@@ -37,24 +37,6 @@ const Dashboard = () => {
   const latestReading = liveReading || latestLog || null;
   const moistureThreshold = settings?.moistureThreshold ?? 30;
 
-  const handleManualWater = async () => {
-    try {
-      setWatering(true);
-      const res = await api.post("/water/manual");
-      console.log("Manual water response:", res.data);
-      await fetchData();
-      alert("Manual watering logged and command sent to device.");
-    } catch (err) {
-      console.error("Manual water error:", err.response?.data || err.message);
-      alert(
-        "Failed to trigger manual watering: " +
-          (err.response?.data?.message || err.message)
-      );
-    } finally {
-      setWatering(false);
-    }
-  };
-
   const handleClearLogs = async () => {
     if (!window.confirm("Clear all watering logs?")) return;
     try {
@@ -111,13 +93,6 @@ const Dashboard = () => {
             className="px-4 py-2 text-xs rounded-full border border-slate-300 text-slate-700 bg-white hover:bg-slate-100 disabled:opacity-60"
           >
             {refreshing ? "Refreshing..." : "Refresh from ThingSpeak"}
-          </button>
-          <button
-            onClick={handleManualWater}
-            disabled={watering}
-            className="px-4 py-2 text-xs rounded-full bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-60"
-          >
-            {watering ? "Logging..." : "Manual Watering"}
           </button>
           <button
             onClick={handleClearLogs}
@@ -178,20 +153,7 @@ const Dashboard = () => {
           <ThingSpeakGraphs />
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-2xl p-3 shadow-sm">
-          <h2 className="text-sm font-semibold text-slate-800 mb-2">
-            Recent Watering Summary
-          </h2>
-          <p className="text-xs text-slate-500 mb-2">
-            Total events:{" "}
-            <span className="text-emerald-600 font-semibold">
-              {logs.length}
-            </span>
-          </p>
-          <div className="max-h-[260px] overflow-y-auto">
-            <LogsTable logs={logs} moistureThreshold={moistureThreshold} />
-          </div>
-        </div>
+        <WateringStatsCard logs={logs} />
       </div>
 
       {/* Full log table */}
@@ -336,6 +298,100 @@ const StatCard = ({ label, value, unit, accent = "emerald" }) => {
       <div className={`text-xl font-semibold ${accentClass}`}>
         {value}
         {unit && <span className="text-xs text-slate-500 ml-1">{unit}</span>}
+      </div>
+    </div>
+  );
+};
+
+const WateringStatsCard = ({ logs }) => {
+  if (!logs.length) {
+    return (
+      <div className="bg-white border border-slate-200 rounded-2xl p-3 shadow-sm">
+        <h2 className="text-sm font-semibold text-slate-800 mb-1">
+          Watering Stats
+        </h2>
+        <p className="text-xs text-slate-500">
+          No watering events recorded yet.
+        </p>
+      </div>
+    );
+  }
+
+  const last = logs[0];
+  const now = new Date();
+
+  // watered today
+  const wateredToday = logs.filter((log) => {
+    const d = new Date(log.timestamp);
+    return (
+      d.getFullYear() === now.getFullYear() &&
+      d.getMonth() === now.getMonth() &&
+      d.getDate() === now.getDate()
+    );
+  }).length;
+
+  // moisture stats
+  const moistures = logs.map((l) => l.soilMoisture).filter((m) => m != null);
+  const avgMoisture =
+    moistures.reduce((sum, m) => sum + m, 0) / moistures.length;
+  const minMoisture = Math.min(...moistures);
+  const maxMoisture = Math.max(...moistures);
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-2xl p-3 shadow-sm">
+      <h2 className="text-sm font-semibold text-slate-800 mb-2">
+        Watering Stats
+      </h2>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+        <div className="space-y-1">
+          <div className="text-[11px] uppercase tracking-wide text-slate-400">
+            Last watered
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="font-medium text-slate-800">
+              {new Date(last.timestamp).toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </span>
+            <span className="px-2 py-0.5 rounded-full text-[11px] bg-slate-100 text-slate-700 capitalize">
+              {last.wateredBy}
+            </span>
+          </div>
+        </div>
+
+        <div className="space-y-1">
+          <div className="text-[11px] uppercase tracking-wide text-slate-400">
+            Watered today
+          </div>
+          <div className="text-sm font-semibold text-emerald-600">
+            {wateredToday}{" "}
+            <span className="text-[11px] text-slate-500 font-normal">
+              event{wateredToday === 1 ? "" : "s"}
+            </span>
+          </div>
+        </div>
+
+        <div className="space-y-1">
+          <div className="text-[11px] uppercase tracking-wide text-slate-400">
+            Avg moisture at watering
+          </div>
+          <div className="text-sm font-semibold text-sky-600">
+            {avgMoisture.toFixed(0)}
+          </div>
+        </div>
+
+        <div className="space-y-1">
+          <div className="text-[11px] uppercase tracking-wide text-slate-400">
+            Min / Max moisture
+          </div>
+          <div className="text-sm font-semibold text-violet-600">
+            {minMoisture}{" "}
+            <span className="text-[11px] text-slate-400 mx-1">•</span>
+            {maxMoisture}
+          </div>
+        </div>
       </div>
     </div>
   );
