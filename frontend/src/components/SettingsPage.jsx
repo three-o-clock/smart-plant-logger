@@ -94,6 +94,27 @@ const SettingsPage = () => {
             className="w-full px-2 py-1 text-sm bg-white border border-slate-700 rounded"
           />
         </div>
+        <div>
+          <label className="block text-xs mb-1">ThingSpeak Read API Key</label>
+          <input
+            type="text"
+            name="thingSpeakReadApiKey"
+            value={settings.thingSpeakReadApiKey ?? ""}
+            onChange={handleChange}
+            className="w-full px-2 py-1 text-sm bg-white border border-slate-700 rounded"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs mb-1">ThingSpeak Write API Key</label>
+          <input
+            type="text"
+            name="thingSpeakWriteApiKey"
+            value={settings.thingSpeakWriteApiKey ?? ""}
+            onChange={handleChange}
+            className="w-full px-2 py-1 text-sm bg-white border border-slate-700 rounded"
+          />
+        </div>
 
         <button
           onClick={handleSave}

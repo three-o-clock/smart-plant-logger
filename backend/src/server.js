@@ -2,6 +2,8 @@ import express from "express";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 import cors from "cors";
+import thingSpeakRoutes from "./routes/thingspeak.js";
+
 
 import authRoutes from "./routes/auth.js";
 import logRoutes from "./routes/logs.js";
@@ -20,6 +22,8 @@ app.use("/api/auth", authRoutes);
 app.use("/api/logs", logRoutes);
 app.use("/api/settings", settingsRoutes);
 app.use("/api/water", waterRoutes);
+app.use("/api/thingspeak", thingSpeakRoutes);
+
 
 app.get("/", (req, res) => {
   res.send("Smart Plant Logger API running");
