@@ -6,4 +6,4 @@
     - **Extend for multiple water pumps**:- Currently, this only supports a single water pump. We are planning to upgrade it to provide support for multiple water pumps to cover a larger area but with the same web application.
     - **Deployment**:- Hosted locally at the moment. This is at the top of the priority list.
 
--# Built for `Internet of Things` coursework.
+`Built for Internet of Things coursework.`
