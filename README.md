@@ -25,14 +25,6 @@ Smart Plant Logger allows users to remotely monitor plant health and manage wate
 
 The Raspberry Pi runs the watering pump and publishes sensor data (soil moisture, etc.) to an MQTT broker. The web application subscribes to these topics to display live plant health data and publishes commands back to the Pi to trigger manual watering.
 
-## Getting Started
-
-### Prerequisites
-
-- Raspberry Pi with the watering hardware set up
-- MQTT broker running (locally or on a server)
-- [Any other dependencies, e.g. Node.js, Python version]
-
 ## Planned Improvements
 
 - **Multiple pump support:** Extend the system to control multiple water pumps independently, allowing coverage of a larger growing area from the same web interface.
