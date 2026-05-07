@@ -15,9 +15,9 @@ Smart Plant Logger allows users to remotely monitor plant health and manage wate
 
 ## Tech Stack
 
-- **Hardware:** Raspberry Pi
-- **Communication Protocol:** MQTT
-- **Frontend:** HTML, CSS
+- **Hardware:** Raspberry Pi, Arduino Uno R4 WiFi
+- **Communication Protocol:** MQTT, HTTP
+- **Frontend:** HTML, CSS, Javascript
 - **Backend:** Node.js
 - **Broker:** Mosquitto
 
